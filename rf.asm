@@ -6,11 +6,14 @@
 ; Default is 400.777Mhz measured = 273436
 ;RF_DF       equ     D'273436' ;400.777
 ;RF_DF       equ     D'272906' ;399.777
-;RF_DF       equ     D'215040' ;315
+RF_DF       equ     D'215040' ;315
 ;RF_DF       equ     D'212672' ;311.544
 ;RF_DF       equ     D'210944' ;
 ;RF_DF       equ     D'208213' ;305
-RF_DF       equ     D'207411'
+;RF_DF       equ     D'207411'
+
+KHZ_DELAY   equ     D'250'
+KHZ3_DELAY  equ     D'166'
 
 ; RF commands (first byte of 3)
 RF_WAPP     equ     0x0
@@ -23,6 +26,10 @@ RED_LED     equ     4
 GREEN_LED   equ     1
 RF_CTRL     equ     5
 RF_DATA     equ     2
+
+; RF Ceiling Fan Protocol
+; 3KHz, 1 = 0b110, 0 = 0b010
+; 11.5 ms between packets
 
 ; Common Bank Variables (0-3)
 TEMP        equ     0x7
@@ -46,9 +53,32 @@ green_off macro
         pin_on  GREEN_LED
         endm
 
+delayp  macro
+        movlw   KHZ3_DELAY
+        call    delayw
+        endm
+
+delayms macro
+        movlw   KHZ_DELAY
+        call    delayw
+        endm
+
+fan_bit macro   reg, bit
+        btfss   reg, bit
+        pin_on  RF_DATA
+        btfss   reg, bit
+        pin_off RF_DATA
+        call    _fan_bit
+        endm
+
+fan_start   macro
+        pin_off RF_DATA
+        call    _fan_bit
+        endm
+
 start:
-        ; set prescaler to max (/8)
-        movlw   NOT_RBPU & NOT_RBWU & b'111'
+        ; set prescaler to (/4). 8MHz/4/4 = 500KHz, though I seem to be getting 250 somehow
+        movlw   (1 << NOT_RBPU) | (1 << NOT_RBWU) | b'000'
         option
 
         ; outputs
@@ -59,7 +89,7 @@ start:
         red_on
 
         ; Overly long delay to wait for RF to be ready
-        call    delay_ms
+        delayms
         red_off
 
         ; Program freq
@@ -70,30 +100,73 @@ start:
         movlw   (RF_DF >> 0) & 0xff
         call    rf_outw
 
-        call    delay_ms
+        delayms
+
+FAN_LIGHT_CMD   equ     b'110010000001'
+
+fan_send:
+        green_on
+        fan_start
+        movlw   FAN_LIGHT_CMD >> 4
+        movwf   TEMP
+        fan_bit TEMP, 7
+        fan_bit TEMP, 6
+        fan_bit TEMP, 5
+        fan_bit TEMP, 4
+        fan_bit TEMP, 3
+        fan_bit TEMP, 2
+        fan_bit TEMP, 1
+        fan_bit TEMP, 0
+        movlw   FAN_LIGHT_CMD & 0xf
+        movwf   TEMP
+        fan_bit TEMP, 3
+        fan_bit TEMP, 2
+        fan_bit TEMP, 1
+        fan_bit TEMP, 0
+        green_off
+
+        delayms
+        delayms
+        delayms
+        delayms
+        delayms
+        delayms
+        delayms
+        delayms
+        delayms
+        delayms
+        delayms
+        goto fan_send
 
 flash_leds:
         ; test top bit of timer
         red_on
         pin_on  RF_DATA
-        call    delay_ms
+        delayp
         red_off
         pin_off  RF_DATA
-        call    delay_ms
+        delayp
         goto    flash_leds
 
-delay_ms:
-        movlw   D'7'
+delayw:
         movwf   TEMP
         movlw   0x0
         movwf   TMR0
-delay_ms_loop:
+delayw_loop:
         movf    TMR0, w
         subwf   TEMP, w
         btfsc   STATUS, C
-        goto    delay_ms_loop
+        goto    delayw_loop
         retlw   0x0
 
+_fan_bit:
+        delayp
+        pin_on  RF_DATA
+        delayp
+        pin_off RF_DATA
+        delayp
+        retlw   0x0
+        
 rf_bit  macro   reg, bit
         pin_on  RF_DATA
         btfss   reg, bit
