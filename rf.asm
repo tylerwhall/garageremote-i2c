@@ -105,8 +105,9 @@ start:
 
 FAN_LIGHT_CMD   equ     b'110010000001'
 
+        green_on
 fan_send:
-        red_on
+#if 0
         movlw   FAN_LIGHT_CMD >> 4
         movwf   FAN_OUT
         fan_start
@@ -124,8 +125,14 @@ fan_send:
         fan_bit FAN_OUT, 2
         fan_bit FAN_OUT, 1
         fan_bit FAN_OUT, 0
-        red_off
-
+#endif
+        pin_on  RF_DATA
+        delayms
+        pin_off  RF_DATA
+        delayms
+        pin_on  RF_DATA
+        delayms
+        pin_off  RF_DATA
         delayms
         delayms
         delayms
