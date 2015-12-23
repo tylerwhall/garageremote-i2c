@@ -75,9 +75,9 @@ delayms macro
         endm
 
 fan_bit macro   reg, bit
-        btfss   reg, bit
-        pin_on  RF_DATA
         btfsc   reg, bit
+        pin_on  RF_DATA
+        btfss   reg, bit
         pin_off RF_DATA
         call    _fan_bit
         endm
