@@ -70,8 +70,7 @@ delayp  macro
         endm
 
 delayms macro
-        movlw   KHZ_DELAY
-        call    delayw
+        call    _delayms
         endm
 
 fan_bit macro   reg, bit
@@ -221,6 +220,12 @@ delayw_loop:
         subwf   TEMP, w
         btfsc   STATUS, C
         goto    delayw_loop
+        retlw   0x0
+
+_delayms:
+        delayp
+        delayp
+        delayp
         retlw   0x0
 
 _fan_bit:
