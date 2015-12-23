@@ -6,11 +6,11 @@
 ; Default is 400.777Mhz measured = 273436
 ;RF_DF       equ     D'273436' ;400.777
 ;RF_DF       equ     D'272906' ;399.777
-RF_DF       equ     D'215040' ;315
+;RF_DF       equ     D'215040' ;315
 ;RF_DF       equ     D'212672' ;311.544
 ;RF_DF       equ     D'210944' ;
 ;RF_DF       equ     D'208213' ;305
-;RF_DF       equ     D'207411'
+RF_DF       equ     D'207411'
 
 KHZ3_DELAY  equ     D'158' ; 476MHz/3
 
@@ -96,7 +96,6 @@ start:
         movwf   PORTB
         movlw   0xff & ~(1 << RED_LED | 1 << GREEN_LED | 1 << RF_CTRL | 1 << RF_DATA)
         tris    PORTB
-        red_on
 
         ; Overly long delay to wait for RF to be ready
         delayms
@@ -129,11 +128,14 @@ start:
         delayms
         delayms
 
+        red_off
+
 FAN_LIGHT_CMD   equ     b'110010000001'
 
         green_on
 fan_send:
 #if 1
+        red_on
         movlw   FAN_LIGHT_CMD >> 4
         movwf   FAN_OUT
         fan_start
@@ -151,43 +153,10 @@ fan_send:
         fan_bit FAN_OUT, 2
         fan_bit FAN_OUT, 1
         fan_bit FAN_OUT, 0
-#endif
-#if 0
-        pin_on  RF_DATA
-        red_on
-        delayp
         red_off
-        pin_off RF_DATA
-        delayp
-        goto fan_send
 #endif
-        red_off
 
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
+        ; 11 ms delay between commands
         delayms
         delayms
         delayms
