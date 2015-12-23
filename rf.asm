@@ -33,6 +33,7 @@ RF_DATA     equ     2
 
 ; Common Bank Variables (0-3)
 TEMP        equ     0x7
+FAN_OUT     equ     0x8
 
 pin_off macro   pin
         bcf     PORTB, pin
@@ -64,9 +65,9 @@ delayms macro
         endm
 
 fan_bit macro   reg, bit
-        btfss   reg, bit
-        pin_on  RF_DATA
-        btfss   reg, bit
+        ;btfss   reg, bit
+        ;pin_on  RF_DATA
+        ;btfsc   reg, bit
         pin_off RF_DATA
         call    _fan_bit
         endm
@@ -105,25 +106,25 @@ start:
 FAN_LIGHT_CMD   equ     b'110010000001'
 
 fan_send:
-        green_on
-        fan_start
+        red_on
         movlw   FAN_LIGHT_CMD >> 4
-        movwf   TEMP
-        fan_bit TEMP, 7
-        fan_bit TEMP, 6
-        fan_bit TEMP, 5
-        fan_bit TEMP, 4
-        fan_bit TEMP, 3
-        fan_bit TEMP, 2
-        fan_bit TEMP, 1
-        fan_bit TEMP, 0
+        movwf   FAN_OUT
+        fan_start
+        fan_bit FAN_OUT, 7
+        fan_bit FAN_OUT, 6
+        fan_bit FAN_OUT, 5
+        fan_bit FAN_OUT, 4
+        fan_bit FAN_OUT, 3
+        fan_bit FAN_OUT, 2
+        fan_bit FAN_OUT, 1
+        fan_bit FAN_OUT, 0
         movlw   FAN_LIGHT_CMD & 0xf
-        movwf   TEMP
-        fan_bit TEMP, 3
-        fan_bit TEMP, 2
-        fan_bit TEMP, 1
-        fan_bit TEMP, 0
-        green_off
+        movwf   FAN_OUT
+        fan_bit FAN_OUT, 3
+        fan_bit FAN_OUT, 2
+        fan_bit FAN_OUT, 1
+        fan_bit FAN_OUT, 0
+        red_off
 
         delayms
         delayms
