@@ -27,9 +27,10 @@ RF_APP_MAN      equ     D'15'
 RF_APP_OOK      equ     D'14'
 RF_APP_BAND8    equ     D'13'
 RF_APP_POWER10  equ     D'4'
+RF_APP_RESERV   equ     b'100'
 
-RF_APP_MAN_VAL  equ     (1 << RF_APP_MAN) | (1 << RF_APP_OOK); | (1 << RF_APP_POWER10)
-RF_APP_AUT_VAL  equ                         (1 << RF_APP_OOK); | (1 << RF_APP_POWER10)
+RF_APP_MAN_VAL  equ     (1 << RF_APP_MAN) | (1 << RF_APP_OOK) | RF_APP_RESERV; | (1 << RF_APP_POWER10)
+RF_APP_AUT_VAL  equ                         (1 << RF_APP_OOK) | RF_APP_RESERV; | (1 << RF_APP_POWER10)
 
 RED_LED     equ     4
 GREEN_LED   equ     1
