@@ -22,6 +22,15 @@ RF_WFREQ    equ     0x18
 RF_RFREQ    equ     0x44
 RF_RSTAT    equ     0x55
 
+; RF app register
+RF_APP_MAN      equ     15
+RF_APP_OOK      equ     14
+RF_APP_BAND8    equ     13
+RF_APP_POWER10  equ     4
+
+RF_APP_MAN_VAL  equ     (1 << RF_APP_MAN) | (1 << RF_APP_OOK) | (1 << RF_APP_POWER10)
+RF_APP_AUT_VAL  equ                         (1 << RF_APP_OOK) | (1 << RF_APP_POWER10)
+
 RED_LED     equ     4
 GREEN_LED   equ     1
 RF_CTRL     equ     5
@@ -65,9 +74,9 @@ delayms macro
         endm
 
 fan_bit macro   reg, bit
-        ;btfss   reg, bit
-        ;pin_on  RF_DATA
-        ;btfsc   reg, bit
+        btfss   reg, bit
+        pin_on  RF_DATA
+        btfsc   reg, bit
         pin_off RF_DATA
         call    _fan_bit
         endm
@@ -101,6 +110,14 @@ start:
         movlw   (RF_DF >> 0) & 0xff
         call    rf_outw
 
+        ; Manual mode
+        movlw   RF_WAPP
+        call    rf_outw
+        movlw   (RF_APP_MAN >> 8) & 0xff
+        call    rf_outw
+        movlw   (RF_APP_MAN >> 0) & 0xff
+        call    rf_outw
+
         delayms
 
 FAN_LIGHT_CMD   equ     b'110010000001'
@@ -127,12 +144,14 @@ fan_send:
         fan_bit FAN_OUT, 0
 #endif
         pin_on  RF_DATA
-        delayms
-        pin_off  RF_DATA
-        delayms
-        pin_on  RF_DATA
-        delayms
-        pin_off  RF_DATA
+        red_on
+        delayp
+        red_off
+        pin_off RF_DATA
+        delayp
+        goto fan_send
+
+
         delayms
         delayms
         delayms
@@ -183,6 +202,8 @@ rf_bit  macro   reg, bit
         pin_off RF_CTRL
         endm
 
+; Could be made into a function with a shift
+;  quite inefficient as-is
 rf_out  macro   reg
         rf_bit  reg, 7
         rf_bit  reg, 6
