@@ -6,14 +6,13 @@
 ; Default is 400.777Mhz measured = 273436
 ;RF_DF       equ     D'273436' ;400.777
 ;RF_DF       equ     D'272906' ;399.777
-;RF_DF       equ     D'215040' ;315
+RF_DF       equ     D'215040' ;315
 ;RF_DF       equ     D'212672' ;311.544
 ;RF_DF       equ     D'210944' ;
 ;RF_DF       equ     D'208213' ;305
-RF_DF       equ     D'207411'
+;RF_DF       equ     D'207411'
 
-KHZ_DELAY   equ     D'250'
-KHZ3_DELAY  equ     D'166'
+KHZ3_DELAY  equ     D'158' ; 476MHz/3
 
 ; RF commands (first byte of 3)
 RF_WAPP     equ     0x0
@@ -29,8 +28,8 @@ RF_APP_BAND8    equ     D'13'
 RF_APP_POWER10  equ     D'4'
 RF_APP_RESERV   equ     b'100'
 
-RF_APP_MAN_VAL  equ     (1 << RF_APP_MAN) | (1 << RF_APP_OOK) | RF_APP_RESERV; | (1 << RF_APP_POWER10)
-RF_APP_AUT_VAL  equ                         (1 << RF_APP_OOK) | RF_APP_RESERV; | (1 << RF_APP_POWER10)
+RF_APP_MAN_VAL  equ     (1 << RF_APP_MAN) | (1 << RF_APP_OOK) | RF_APP_RESERV | (1 << RF_APP_POWER10)
+RF_APP_AUT_VAL  equ                         (1 << RF_APP_OOK) | RF_APP_RESERV | (1 << RF_APP_POWER10)
 
 RED_LED     equ     4
 GREEN_LED   equ     1
@@ -87,7 +86,8 @@ fan_start   macro
         endm
 
 start:
-        ; set prescaler to (/4). 8MHz/4/4 = 500KHz, though I seem to be getting 250 somehow
+        ; set prescaler to (/2). 4MHz/4/2 = 500KHz
+        ; measured CPU frequency is 3.8095 MHz, so 476Khz
         movlw   (1 << NOT_RBPU) | (1 << NOT_RBWU) | b'000'
         option
 
@@ -119,9 +119,9 @@ start:
         ; Manual mode
         movlw   RF_WAPP
         call    rf_outw
-        movlw   (RF_APP_MAN >> 8) & 0xff
+        movlw   (RF_APP_MAN_VAL >> 8) & 0xff
         call    rf_outw
-        movlw   (RF_APP_MAN >> 0) & 0xff
+        movlw   (RF_APP_MAN_VAL >> 0) & 0xff
         call    rf_outw
 #endif
 
@@ -200,16 +200,6 @@ fan_send:
         delayms
         delayms
         goto fan_send
-
-flash_leds:
-        ; test top bit of timer
-        red_on
-        pin_on  RF_DATA
-        delayp
-        red_off
-        pin_off  RF_DATA
-        delayp
-        goto    flash_leds
 
 delayw:
         movwf   TEMP
