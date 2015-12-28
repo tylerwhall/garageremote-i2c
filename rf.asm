@@ -136,20 +136,10 @@ loop:
         movlw   FAN_LIGHT_CMD >> 4
         movwf   FAN_OUT
         fan_start
-        fan_bit FAN_OUT, 7
-        fan_bit FAN_OUT, 6
-        fan_bit FAN_OUT, 5
-        fan_bit FAN_OUT, 4
-        fan_bit FAN_OUT, 3
-        fan_bit FAN_OUT, 2
-        fan_bit FAN_OUT, 1
-        fan_bit FAN_OUT, 0
+        call fan_send8
         movlw   FAN_LIGHT_CMD & 0xf
         movwf   FAN_OUT
-        fan_bit FAN_OUT, 3
-        fan_bit FAN_OUT, 2
-        fan_bit FAN_OUT, 1
-        fan_bit FAN_OUT, 0
+        call fan_send4
         red_off
 
         ; 11 ms delay between commands
@@ -166,6 +156,20 @@ loop:
         delayms
         goto loop
 
+; Uses 3 stack
+fan_send8:
+        fan_bit FAN_OUT, 7
+        fan_bit FAN_OUT, 6
+        fan_bit FAN_OUT, 5
+        fan_bit FAN_OUT, 4
+fan_send4:
+        fan_bit FAN_OUT, 3
+        fan_bit FAN_OUT, 2
+        fan_bit FAN_OUT, 1
+        fan_bit FAN_OUT, 0
+        retlw   0x0
+
+; Uses 1 stack
 delayw:
         movwf   TEMP
         movlw   0x0
@@ -177,12 +181,14 @@ delayw_loop:
         goto    delayw_loop
         retlw   0x0
 
+; Uses 2 stack
 _delayms:
         delayp
         delayp
         delayp
         retlw   0x0
 
+; Uses 2 stack
 _fan_bit:
         delayp
         pin_on  RF_DATA
