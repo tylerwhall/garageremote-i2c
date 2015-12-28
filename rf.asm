@@ -41,14 +41,13 @@ RF_DATA     equ     2
 ; 11.5 ms between packets
 
 FAN_LIGHT_CMD   equ     b'110010000001'
+FAN21_CMD       equ     b'1110111110001101'
 
 ; Common Bank Variables
 TEMP        equ     0x7
 FAN_OUTB    equ     0x8
 FAN_OUT0    equ     0x9
 FAN_OUT1    equ     0x10
-FAN_OUT2    equ     0x11
-FAN_OUT3    equ     0x12
 
 pin_off macro   pin
         bcf     PORTB, pin
@@ -139,17 +138,14 @@ start:
         movwf   FAN_OUT0
         movlw   FAN_LIGHT_CMD & 0xff
         movwf   FAN_OUT1
-loop:
-        red_on
-        fan_start
-        movf    FAN_OUT0, w
-        movwf   FAN_OUTB
-        call fan_send4
-        movf    FAN_OUT1, w
-        movwf   FAN_OUTB
-        call fan_send8
-        red_off
 
+        movlw   FAN21_CMD >> d'8'
+        movwf   FAN_OUT0
+        movlw   FAN21_CMD & 0xff
+        movwf   FAN_OUT1
+loop:
+        ;call    fan_cmd12bit
+        call    fan_cmd21bit
         ; 11 ms delay between commands
         delayms
         delayms
@@ -163,6 +159,61 @@ loop:
         delayms
         delayms
         goto loop
+
+; Sends a 12-bit command. Bits 3-0 in FAN_OUT0 followed by 7-0 in FAN_OUT1
+; Uses 4 stack
+fan_cmd12bit:
+        red_on
+        fan_start
+        movf    FAN_OUT0, w
+        movwf   FAN_OUTB
+        call fan_send4
+        movf    FAN_OUT1, w
+        movwf   FAN_OUTB
+        call fan_send8
+        red_off
+        retlw   0x0
+
+; Sends a 21-bit command. 16 bits in FAN_OUT0,1, a constant 1, then calculated 4-bit checksum
+; Uses 4 stack
+fan_cmd21bit:
+        red_on
+        fan_start
+        ; 8 bits
+        movf    FAN_OUT0, w
+        movwf   FAN_OUTB
+        call fan_send8
+        ; 8 bits
+        movf    FAN_OUT1, w
+        movwf   FAN_OUTB
+        call fan_send8
+        ; Constant 1 bit
+        pin_on  RF_DATA
+        call    _fan_bit
+        ; Calculate checksum into FAN_OUTB
+        swapf   FAN_OUT0, w
+        andlw   0xf
+        movwf   FAN_OUTB
+
+        movf    FAN_OUT0, w
+        andlw   0xf
+        addwf   FAN_OUTB, f
+
+        swapf   FAN_OUT1, w
+        andlw   0xf
+        addwf   FAN_OUTB, f
+
+        movf    FAN_OUT1, w
+        andlw   0xf
+        addwf   FAN_OUTB, f
+
+        ; Add 3 to the checksum
+        movlw   0x3
+        addwf   FAN_OUTB, f
+
+        call    fan_send4
+        red_off
+        retlw   0x0
 
 ; Uses 3 stack
 fan_send8:
