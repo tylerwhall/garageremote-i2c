@@ -40,6 +40,8 @@ RF_DATA     equ     2
 ; 3KHz, 1 = 0b110, 0 = 0b010
 ; 11.5 ms between packets
 
+FAN_LIGHT_CMD   equ     b'110010000001'
+
 ; Common Bank Variables (0-3)
 TEMP        equ     0x7
 FAN_OUT     equ     0x8
@@ -114,7 +116,6 @@ start:
         delayms
         delayms
 
-#if 1
         ; Manual mode
         movlw   RF_WAPP
         call    rf_outw
@@ -122,7 +123,6 @@ start:
         call    rf_outw
         movlw   (RF_APP_MAN_VAL >> 0) & 0xff
         call    rf_outw
-#endif
 
         delayms
         delayms
@@ -130,11 +130,8 @@ start:
 
         red_off
 
-FAN_LIGHT_CMD   equ     b'110010000001'
-
         green_on
-fan_send:
-#if 1
+loop:
         red_on
         movlw   FAN_LIGHT_CMD >> 4
         movwf   FAN_OUT
@@ -154,7 +151,6 @@ fan_send:
         fan_bit FAN_OUT, 1
         fan_bit FAN_OUT, 0
         red_off
-#endif
 
         ; 11 ms delay between commands
         delayms
@@ -168,7 +164,7 @@ fan_send:
         delayms
         delayms
         delayms
-        goto fan_send
+        goto loop
 
 delayw:
         movwf   TEMP
