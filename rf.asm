@@ -42,9 +42,13 @@ RF_DATA     equ     2
 
 FAN_LIGHT_CMD   equ     b'110010000001'
 
-; Common Bank Variables (0-3)
+; Common Bank Variables
 TEMP        equ     0x7
-FAN_OUT     equ     0x8
+FAN_OUTB    equ     0x8
+FAN_OUT0    equ     0x9
+FAN_OUT1    equ     0x10
+FAN_OUT2    equ     0x11
+FAN_OUT3    equ     0x12
 
 pin_off macro   pin
         bcf     PORTB, pin
@@ -131,15 +135,19 @@ start:
         red_off
 
         green_on
+        movlw   FAN_LIGHT_CMD >> 8
+        movwf   FAN_OUT0
+        movlw   FAN_LIGHT_CMD & 0xff
+        movwf   FAN_OUT1
 loop:
         red_on
-        movlw   FAN_LIGHT_CMD >> 4
-        movwf   FAN_OUT
         fan_start
-        call fan_send8
-        movlw   FAN_LIGHT_CMD & 0xf
-        movwf   FAN_OUT
+        movf    FAN_OUT0, w
+        movwf   FAN_OUTB
         call fan_send4
+        movf    FAN_OUT1, w
+        movwf   FAN_OUTB
+        call fan_send8
         red_off
 
         ; 11 ms delay between commands
@@ -158,15 +166,15 @@ loop:
 
 ; Uses 3 stack
 fan_send8:
-        fan_bit FAN_OUT, 7
-        fan_bit FAN_OUT, 6
-        fan_bit FAN_OUT, 5
-        fan_bit FAN_OUT, 4
+        fan_bit FAN_OUTB, 7
+        fan_bit FAN_OUTB, 6
+        fan_bit FAN_OUTB, 5
+        fan_bit FAN_OUTB, 4
 fan_send4:
-        fan_bit FAN_OUT, 3
-        fan_bit FAN_OUT, 2
-        fan_bit FAN_OUT, 1
-        fan_bit FAN_OUT, 0
+        fan_bit FAN_OUTB, 3
+        fan_bit FAN_OUTB, 2
+        fan_bit FAN_OUTB, 1
+        fan_bit FAN_OUTB, 0
         retlw   0x0
 
 ; Uses 1 stack
