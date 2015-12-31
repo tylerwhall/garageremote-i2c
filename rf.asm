@@ -35,6 +35,8 @@ RED_LED     equ     4
 GREEN_LED   equ     1
 RF_CTRL     equ     5
 RF_DATA     equ     2
+I2C_SDA     equ     0 ; Pin 13 / ICSP DAT
+I2C_SCL     equ     3 ; Pin 4 / VPP
 
 ; RF Ceiling Fan Protocol
 ; 3KHz, 1 = 0b110, 0 = 0b010
@@ -47,7 +49,9 @@ FAN21_CMD       equ     b'1110111110001101'
 TEMP        equ     0x7
 FAN_OUTB    equ     0x8
 FAN_OUT0    equ     0x9
-FAN_OUT1    equ     0x10
+FAN_OUT1    equ     0xa
+I2C_PREV    equ     0xb
+I2C_CHANGED equ     0xc
 
 pin_off macro   pin
         bcf     PORTB, pin
@@ -118,6 +122,8 @@ start:
         delayms
         delayms
         delayms
+
+        goto do_i2c
 
         ; Manual mode
         movlw   RF_WAPP
@@ -282,4 +288,71 @@ rf_outw:
         rf_out  TEMP
         retlw   0x0
 
+; i2c slave bitbang
+
+I2C_SDA_MASK    equ     (1 << I2C_SDA)
+I2C_SCL_MASK    equ     (1 << I2C_SCL)
+I2C_PIN_MASK    equ     (I2C_SDA_MASK | I2C_SCL_MASK)
+
+gotoz   macro label
+        btfsc   STATUS, Z
+        goto    label
+        endm
+
+; Wait for i2c lines to change from previous saved state. Return the pin number
+; that changed in W. Update previous saved state.
+i2c_wait_for_change:
+        ; Read current state
+        movf    PORTB, w
+        andlw   I2C_PIN_MASK
+
+        ; Stash current state
+        movwf   TEMP
+        ; Compare with previous
+        xorwf   I2C_PREV, w
+        gotoz   i2c_wait_for_change
+        movwf   I2C_CHANGED
+        ; Update prev state with new value
+        movf    TEMP, w
+        movwf   I2C_PREV
+        retlw   0x0
+
+do_i2c:
+        ; Initialize previous value
+        movf    PORTB, w
+        andlw   I2C_PIN_MASK
+        movwf   I2C_PREV
+
+i2c_loop:
+        call i2c_wait_for_change
+
+        ; If SDA first, turn on green
+        btfsc   I2C_CHANGED, I2C_SDA
+        goto    green_halt
+
+        ; If SCL first, turn on red
+        btfsc   I2C_CHANGED, I2C_SCL
+        goto    red_halt
+
+        movf    I2C_CHANGED, f
+        gotoz   i2c_loop
+
+halt:
+        green_on
+        red_on
+        goto halt
+
+green_halt:
+        red_off
+        green_on
+        goto green_halt
+
+red_halt:
+        red_on
+        green_off
+        goto red_halt
+
+        ; Wait for start (sda x low, scl high)
+
+        goto    do_i2c
         end
