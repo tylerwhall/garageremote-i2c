@@ -299,6 +299,36 @@ gotoz   macro label
         goto    label
         endm
 
+gotonz  macro label
+        btfss   STATUS, Z
+        goto    label
+        endm
+
+goto_if_i2cstart    macro   label
+        local   out
+        btfss   I2C_CHANGED, I2C_SDA
+        goto    out
+        movlw   I2C_SCL_MASK
+        subwf   I2C_PREV, w
+        gotoz   label
+out:
+        endm
+
+goto_if_i2cstop     macro   label
+        local   out
+        btfss   I2C_CHANGED, I2C_SDA
+        goto    out
+        movlw   I2C_PIN_MASK
+        subwf   I2C_PREV, w
+        gotoz   label
+out:
+        endm
+
+goto_if_i2cdata     macro   label
+        btfsc   I2C_CHANGED, I2C_SCL
+        goto    label
+        endm
+
 ; Wait for i2c lines to change from previous saved state. Return the pin number
 ; that changed in W. Update previous saved state.
 i2c_wait_for_change:
@@ -326,16 +356,12 @@ do_i2c:
 i2c_loop:
         call i2c_wait_for_change
 
-        ; If SDA first, turn on green
-        btfsc   I2C_CHANGED, I2C_SDA
-        goto    green_halt
+        goto_if_i2cstop     red_halt
+        goto_if_i2cstart    green_halt
+        goto    i2c_loop
 
-        ; If SCL first, turn on red
-        btfsc   I2C_CHANGED, I2C_SCL
-        goto    red_halt
-
-        movf    I2C_CHANGED, f
-        gotoz   i2c_loop
+i2c_addr:
+        call i2c_wait_for_change
 
 halt:
         green_on
