@@ -38,6 +38,9 @@ RF_DATA     equ     2
 I2C_SDA     equ     0 ; Pin 13 / ICSP DAT
 I2C_SCL     equ     3 ; Pin 4 / VPP
 
+TRIS_NORMAL     equ     0xff & ~(1 << RED_LED | 1 << GREEN_LED | 1 << RF_CTRL | 1 << RF_DATA)
+TRIS_I2C_ACK    equ     TRIS_NORMAL & ~(1 << I2C_SDA)
+
 ; RF Ceiling Fan Protocol
 ; 3KHz, 1 = 0b110, 0 = 0b010
 ; 11.5 ms between packets
@@ -105,7 +108,7 @@ start:
         ; outputs
         movlw   0xff & ~(1 << RF_CTRL | 1 << RF_DATA)
         movwf   PORTB
-        movlw   0xff & ~(1 << RED_LED | 1 << GREEN_LED | 1 << RF_CTRL | 1 << RF_DATA)
+        movlw   TRIS_NORMAL
         tris    PORTB
 
         ; Overly long delay to wait for RF to be ready
@@ -327,8 +330,12 @@ out:
         endm
 
 goto_if_i2cdata     macro   label
-        btfsc   I2C_CHANGED, I2C_SCL
+        local   out
+        btfss   I2C_CHANGED, I2C_SCL
+        goto    out
+        btfsc   I2C_PREV, I2C_SCL
         goto    label
+out:
         endm
 
 ; Wait for i2c lines to change from previous saved state. Return the pin number
@@ -370,6 +377,27 @@ got_bit:
         rlf     reg, f
         decfsz  LOOP_COUNT, f
         goto    loop
+        ; Drive ack bit
+        bcf     PORTB, I2C_SDA
+        movlw   TRIS_I2C_ACK
+        tris    PORTB
+        ; Wait for clock high
+wait_ack_clock_high:
+        call    i2c_wait_for_change
+        btfss   I2C_CHANGED, I2C_SCL    ; Clock changed
+        goto    wait_ack_clock_high
+        btfss   I2C_PREV, I2C_SCL       ; Clock went high
+        goto    wait_ack_clock_high
+        ; Wait for clock low
+wait_ack_clock_low:
+        call    i2c_wait_for_change
+        btfss   I2C_CHANGED, I2C_SCL    ; Clock changed
+        goto    wait_ack_clock_low
+        btfsc   I2C_PREV, I2C_SCL       ; Clock went low
+        goto    wait_ack_clock_low
+        ; Release data line
+        movlw   TRIS_NORMAL
+        tris    PORTB
         green_off
         endm
 
