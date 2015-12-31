@@ -360,7 +360,6 @@ i2c_read_byte   macro   reg
         local   loop
         local   got_bit
         local   submit_bit
-        green_on
         movlw   8
         movwf   LOOP_COUNT
 loop:
@@ -377,6 +376,9 @@ got_bit:
         rlf     reg, f
         decfsz  LOOP_COUNT, f
         goto    loop
+        endm
+
+i2c_ack         macro
         ; Drive ack bit
         bcf     PORTB, I2C_SDA
         movlw   TRIS_I2C_ACK
@@ -398,7 +400,6 @@ wait_ack_clock_low:
         ; Release data line
         movlw   TRIS_NORMAL
         tris    PORTB
-        green_off
         endm
 
 do_i2c:
@@ -418,7 +419,13 @@ i2c_loop:
         goto                do_i2c  ; Reset on data when idle
 
 i2c_addr:
+        green_on
         i2c_read_byte       I2C_DATA; May jump back to do_i2c
+        movlw   (0x46 << 1 | 0)     ; Address 0x46, write
+        subwf   I2C_DATA, w
+        gotonz  do_i2c              ; Reset if no address match
+        i2c_ack
+        green_off
         goto    red_halt
 
 halt:
