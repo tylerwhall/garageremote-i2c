@@ -1,0 +1,6 @@
+Bottom button - pin 4
+Middle button - pin 13
+Green LED - Open collector pin 12
+Red LED - Open collector pin 3
+Ctrl - pin 2
+Data - pin 11
