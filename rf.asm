@@ -57,6 +57,7 @@ I2C_PREV    equ     0xb
 I2C_CHANGED equ     0xc
 LOOP_COUNT  equ     0xd
 I2C_DATA    equ     0xe
+DELAY_LOOP_COUNT    equ 0xf
 
 pin_off macro   pin
         bcf     PORTB, pin
@@ -82,8 +83,14 @@ delayp  macro
         call    delayw
         endm
 
-delayms macro
+delayms macro   ms
+        local   loop
+        movlw   ms
+        movwf   DELAY_LOOP_COUNT
+loop:
         call    _delayms
+        decfsz  DELAY_LOOP_COUNT, f
+        goto    loop
         endm
 
 fan_bit macro   reg, bit
@@ -99,6 +106,17 @@ fan_start   macro
         call    _fan_bit
         endm
 
+rf_write    macro   b0, b1, b2
+        movlw   b0
+        call    rf_outw
+        movlw   b1
+        call    rf_outw
+        movlw   b2
+        call    rf_outw
+        pin_off RF_DATA
+        delayms 3
+        endm
+
 start:
         ; set prescaler to (/2). 4MHz/4/2 = 500KHz
         ; measured CPU frequency is 3.8095 MHz, so 476Khz
@@ -112,64 +130,46 @@ start:
         tris    PORTB
 
         ; Overly long delay to wait for RF to be ready
-        delayms
-        delayms
-        delayms
+        delayms 3
 
         ; Program freq
-        movlw   RF_WFREQ | (RF_DF >> D'16')
-        call    rf_outw
-        movlw   (RF_DF >> 8) & 0xff
-        call    rf_outw
-        movlw   (RF_DF >> 0) & 0xff
-        call    rf_outw
-
-        delayms
-        delayms
-        delayms
+        rf_write   RF_WFREQ | (RF_DF >> D'16'), (RF_DF >> 8) & 0xff, (RF_DF >> 0) & 0xff
 
         goto do_i2c
 
+rf_on:
         ; Manual mode
-        movlw   RF_WAPP
-        call    rf_outw
-        movlw   (RF_APP_MAN_VAL >> 8) & 0xff
-        call    rf_outw
-        movlw   (RF_APP_MAN_VAL >> 0) & 0xff
-        call    rf_outw
+        rf_write    RF_WAPP, (RF_APP_MAN_VAL >> 8) & 0xff, (RF_APP_MAN_VAL >> 0) & 0xff
+        retlw   0x0
 
-        delayms
-        delayms
-        delayms
+rf_off:
+        ; Automatic mode
+        rf_write    RF_WAPP, (RF_APP_AUT_VAL >> 8) & 0xff, (RF_APP_AUT_VAL >> 0) & 0xff
+        retlw   0x0
 
-        red_off
-
-        green_on
+fan_send_command    macro
+        local   loop
+        call    rf_on
         movlw   FAN_LIGHT_CMD >> 8
         movwf   FAN_OUT0
         movlw   FAN_LIGHT_CMD & 0xff
         movwf   FAN_OUT1
 
-        movlw   FAN21_CMD >> d'8'
-        movwf   FAN_OUT0
-        movlw   FAN21_CMD & 0xff
-        movwf   FAN_OUT1
+        ;movlw   FAN21_CMD >> d'8'
+        ;movwf   FAN_OUT0
+        ;movlw   FAN21_CMD & 0xff
+        ;movwf   FAN_OUT1
+        movlw   d'20'
+        movwf   LOOP_COUNT
 loop:
-        ;call    fan_cmd12bit
-        call    fan_cmd21bit
+        call    fan_cmd12bit
+        ;call    fan_cmd21bit
         ; 11 ms delay between commands
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
-        delayms
+        delayms 9
+        decfsz  LOOP_COUNT, f
         goto loop
+        call    rf_off
+        endm
 
 ; Sends a 12-bit command. Bits 3-0 in FAN_OUT0 followed by 7-0 in FAN_OUT1
 ; Uses 4 stack
@@ -426,7 +426,10 @@ i2c_addr:
         gotonz  do_i2c              ; Reset if no address match
         i2c_ack
         green_off
-        goto    red_halt
+
+        fan_send_command
+
+        goto    do_i2c
 
 halt:
         green_on
