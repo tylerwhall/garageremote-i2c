@@ -52,6 +52,8 @@ FAN_OUT0    equ     0x9
 FAN_OUT1    equ     0xa
 I2C_PREV    equ     0xb
 I2C_CHANGED equ     0xc
+LOOP_COUNT  equ     0xd
+I2C_DATA    equ     0xe
 
 pin_off macro   pin
         bcf     PORTB, pin
@@ -347,7 +349,34 @@ i2c_wait_for_change:
         movwf   I2C_PREV
         retlw   0x0
 
+i2c_read_byte   macro   reg
+        local   loop
+        local   got_bit
+        local   submit_bit
+        green_on
+        movlw   8
+        movwf   LOOP_COUNT
+loop:
+        call i2c_wait_for_change
+        goto_if_i2cdata     got_bit
+        goto_if_i2cstop     do_i2c
+        goto_if_i2cstart    do_i2c
+        goto    loop
+got_bit:
+        btfsc  I2C_PREV, I2C_SDA
+        bsf     STATUS, C
+        btfss  I2C_PREV, I2C_SDA
+        bcf     STATUS, C
+        rlf     reg, f
+        decfsz  LOOP_COUNT, f
+        goto    loop
+        green_off
+        endm
+
 do_i2c:
+        red_off
+        green_off
+
         ; Initialize previous value
         movf    PORTB, w
         andlw   I2C_PIN_MASK
@@ -356,12 +385,13 @@ do_i2c:
 i2c_loop:
         call i2c_wait_for_change
 
-        goto_if_i2cstop     red_halt
-        goto_if_i2cstart    green_halt
-        goto    i2c_loop
+        goto_if_i2cstart    i2c_addr; Ready for address phase
+        goto_if_i2cstop     do_i2c  ; Reset on stop
+        goto                do_i2c  ; Reset on data when idle
 
 i2c_addr:
-        call i2c_wait_for_change
+        i2c_read_byte       I2C_DATA; May jump back to do_i2c
+        goto    red_halt
 
 halt:
         green_on
