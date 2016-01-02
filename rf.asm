@@ -359,29 +359,34 @@ i2c_wait_for_change:
         movwf   I2C_PREV
         retlw   0x0
 
-i2c_read_byte   macro   reg
-        local   loop
-        local   got_bit
-        local   submit_bit
+_i2c_read_byte:
         movlw   8
         movwf   LOOP_COUNT
-loop:
+_i2c_read_byte_loop:
         call i2c_wait_for_change
-        goto_if_i2cdata     got_bit
-        goto_if_i2cstop     do_i2c
-        goto_if_i2cstart    do_i2c
-        goto    loop
-got_bit:
-        btfsc  I2C_PREV, I2C_SDA
+        goto_if_i2cdata     _i2c_read_byte_got_bit
+        goto_if_i2cstop     _i2c_read_byte_fail
+        goto_if_i2cstart    _i2c_read_byte_fail
+        goto                _i2c_read_byte_loop
+_i2c_read_byte_got_bit:
+        btfsc   I2C_PREV, I2C_SDA
         bsf     STATUS, C
-        btfss  I2C_PREV, I2C_SDA
+        btfss   I2C_PREV, I2C_SDA
         bcf     STATUS, C
-        rlf     reg, f
+        rlf     I2C_DATA, f
         decfsz  LOOP_COUNT, f
-        goto    loop
+        goto    _i2c_read_byte_loop
+        retlw   0x0
+_i2c_read_byte_fail:
+        retlw   0x1
+
+i2c_read_byte   macro   label_if_fail
+        call    _i2c_read_byte
+        andlw   0xff                    ; Get return code in status Z
+        gotonz  label_if_fail           ; Reset on nonzero return
         endm
 
-i2c_ack         macro
+i2c_ack:
         ; Drive ack bit
         bcf     PORTB, I2C_SDA
         movlw   TRIS_I2C_ACK
@@ -403,8 +408,9 @@ wait_ack_clock_low:
         ; Release data line
         movlw   TRIS_NORMAL
         tris    PORTB
-        endm
+        retlw   0x0
 
+; I2C Read Entry Point
 do_i2c:
         red_off
         green_off
@@ -421,14 +427,17 @@ i2c_loop:
         goto_if_i2cstop     do_i2c  ; Reset on stop
         goto                do_i2c  ; Reset on data when idle
 
+        ; Read address byte
 i2c_addr:
         green_on
-        i2c_read_byte       I2C_DATA; May jump back to do_i2c
+        i2c_read_byte       do_i2c  ; May jump back to do_i2c
         movlw   (I2C_ADDR << 1 | 0) ; Address, write
         subwf   I2C_DATA, w
         gotonz  do_i2c              ; Reset if no address match
-        i2c_ack
+        call    i2c_ack
         green_off
+
+        ; Read first byte
 
         fan_send_command
 
