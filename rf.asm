@@ -312,14 +312,23 @@ gotonz  macro label
         goto    label
         endm
 
-goto_if_i2cstart    macro   label
-        local   out
-        btfss   I2C_CHANGED, I2C_SDA
-        goto    out
+is_i2cstart:
+        ; SDA should be the only change
+        movlw   I2C_SDA_MASK
+        subwf   I2C_CHANGED, w
+        btfss   STATUS, Z
+        retlw   0x0
+        ; Line state should be SCL high, SDA low
         movlw   I2C_SCL_MASK
         subwf   I2C_PREV, w
-        gotoz   label
-out:
+        btfss   STATUS, Z
+        retlw   0x0
+        retlw   0x1
+
+goto_if_i2cstart    macro   label
+        call    is_i2cstart
+        andlw   0xff
+        gotonz  label
         endm
 
 goto_if_i2cstop     macro   label
@@ -411,6 +420,15 @@ wait_ack_clock_low:
         retlw   0x0
 
 ; I2C Read Entry Point
+; Protocol:
+;   |   Byte 0      |   Byte 1  |   Byte 2     | Byte 3 | Byte 4 |
+;   | I2C_ADDR, R/W | 12/21 bit | Repeat Count | Data 0 | Data 1 |
+;
+;   Byte 1: Bit 0: 1 = 21 bit, 0 = 12 bit
+;   Byte 2: Send command # times, 0-255 => 1-256
+;   Byte 3: First 8 data bits, sent MSB first
+;   Byte 4: 21-bit mode: Bits 0-7: Second 8 data bits (Note 21-bit mode has only 16 data bits due to generated checksum)
+;           12 bit mode: Bits 3-0: Last 4 data bits
 do_i2c:
         red_off
         green_off
@@ -440,6 +458,7 @@ i2c_addr:
         ; Read first byte
 
         fan_send_command
+        i2c_read_byte       do_i2c  ; May jump back to do_i2c
 
         goto    do_i2c
 
