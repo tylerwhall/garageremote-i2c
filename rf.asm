@@ -331,6 +331,12 @@ goto_if_i2cstart    macro   label
         gotonz  label
         endm
 
+goto_notif_i2cstart    macro   label
+        call    is_i2cstart
+        andlw   0xff
+        gotoz  label
+        endm
+
 goto_if_i2cstop     macro   label
         local   out
         btfss   I2C_CHANGED, I2C_SDA
@@ -445,20 +451,27 @@ i2c_loop:
         goto_if_i2cstop     do_i2c  ; Reset on stop
         goto                do_i2c  ; Reset on data when idle
 
-        ; Read address byte
 i2c_addr:
         green_on
+
+        ; Read address
         i2c_read_byte       do_i2c  ; May jump back to do_i2c
         movlw   (I2C_ADDR << 1 | 0) ; Address, write
         subwf   I2C_DATA, w
         gotonz  do_i2c              ; Reset if no address match
         call    i2c_ack
-        green_off
 
         ; Read first byte
+i2c_byte0:
+        call    i2c_wait_for_change
+        goto_if_i2cstop     do_i2c  ; Reset on stop
+        goto_notif_i2cstart i2c_byte0
+        i2c_read_byte       do_i2c  ; May jump back to do_i2c
+        call    i2c_ack
 
         fan_send_command
-        i2c_read_byte       do_i2c  ; May jump back to do_i2c
+
+        green_off
 
         goto    do_i2c
 
