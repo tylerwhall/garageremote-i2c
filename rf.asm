@@ -38,6 +38,9 @@ RF_DATA     equ     2
 I2C_SDA     equ     0 ; Pin 13 / ICSP DAT
 I2C_SCL     equ     3 ; Pin 4 / VPP
 
+; I2C Slave Address
+I2C_ADDR    equ     0x46
+
 TRIS_NORMAL     equ     0xff & ~(1 << RED_LED | 1 << GREEN_LED | 1 << RF_CTRL | 1 << RF_DATA)
 TRIS_I2C_ACK    equ     TRIS_NORMAL & ~(1 << I2C_SDA)
 
@@ -421,7 +424,7 @@ i2c_loop:
 i2c_addr:
         green_on
         i2c_read_byte       I2C_DATA; May jump back to do_i2c
-        movlw   (0x46 << 1 | 0)     ; Address 0x46, write
+        movlw   (I2C_ADDR << 1 | 0) ; Address, write
         subwf   I2C_DATA, w
         gotonz  do_i2c              ; Reset if no address match
         i2c_ack
