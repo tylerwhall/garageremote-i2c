@@ -64,6 +64,7 @@ DELAY_LOOP_COUNT    equ 0xf
 
 ; Bank 0 variables
 FAN_21BIT   equ     0x10
+FAN_LOOP_COUNT  equ 0x11
 
 pin_off macro   pin
         bcf     PORTB, pin
@@ -156,38 +157,29 @@ rf_off:
 fan_send_command    macro
         local   loop
         call    rf_on
-        movlw   FAN_LIGHT_CMD >> 8
-        movwf   FAN_OUT0
-        movlw   FAN_LIGHT_CMD & 0xff
-        movwf   FAN_OUT1
-
-        ;movlw   FAN21_CMD >> d'8'
-        ;movwf   FAN_OUT0
-        ;movlw   FAN21_CMD & 0xff
-        ;movwf   FAN_OUT1
-        movlw   d'20'
-        movwf   LOOP_COUNT
 loop:
+        btfsc   FAN_21BIT, 0
+        call    fan_cmd21bit
+        btfss   FAN_21BIT, 0
         call    fan_cmd12bit
-        ;call    fan_cmd21bit
         ; 11 ms delay between commands
         delayms 9
-        decfsz  LOOP_COUNT, f
+        decfsz  FAN_LOOP_COUNT, f
         goto loop
         call    rf_off
         endm
 
-; Sends a 12-bit command. Bits 3-0 in FAN_OUT0 followed by 7-0 in FAN_OUT1
+; Sends a 12-bit command. Bits 7-0 in FAN_OUT0 followed by 3-0 in FAN_OUT1
 ; Uses 4 stack
 fan_cmd12bit:
         red_on
         fan_start
         movf    FAN_OUT0, w
         movwf   FAN_OUTB
-        call fan_send4
+        call fan_send8
         movf    FAN_OUT1, w
         movwf   FAN_OUTB
-        call fan_send8
+        call fan_send4
         red_off
         retlw   0x0
 
@@ -441,7 +433,7 @@ i2c_byte    macro   reg_out, label_if_fail
 ;   | I2C_ADDR, R/W | 12/21 bit | Repeat Count | Data 0 | Data 1 |
 ;
 ;   Byte 1: Bit 0: 1 = 21 bit, 0 = 12 bit
-;   Byte 2: Send command # times, 0-255 => 1-256
+;   Byte 2: Send command # times, 1-255 => 1-255, 0 => 256
 ;   Byte 3: First 8 data bits, sent MSB first
 ;   Byte 4: 21-bit mode: Bits 0-7: Second 8 data bits (Note 21-bit mode has only 16 data bits due to generated checksum)
 ;           12 bit mode: Bits 3-0: Last 4 data bits
@@ -473,7 +465,7 @@ i2c_addr:
 
         ; Read data bytes
         i2c_byte    FAN_21BIT,  do_i2c
-        i2c_byte    TEMP,       do_i2c
+        i2c_byte    FAN_LOOP_COUNT, do_i2c
         i2c_byte    FAN_OUT0,   do_i2c
         i2c_byte    FAN_OUT1,   do_i2c
 
