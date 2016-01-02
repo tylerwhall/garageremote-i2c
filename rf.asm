@@ -62,6 +62,9 @@ LOOP_COUNT  equ     0xd
 I2C_DATA    equ     0xe
 DELAY_LOOP_COUNT    equ 0xf
 
+; Bank 0 variables
+FAN_21BIT   equ     0x10
+
 pin_off macro   pin
         bcf     PORTB, pin
         endm
@@ -425,6 +428,13 @@ wait_ack_clock_low:
         tris    PORTB
         retlw   0x0
 
+i2c_byte    macro   reg_out, label_if_fail
+        i2c_read_byte       label_if_fail  ; May jump back to do_i2c
+        call    i2c_ack
+        movf    I2C_DATA, w
+        movwf   reg_out
+        endm
+
 ; I2C Read Entry Point
 ; Protocol:
 ;   |   Byte 0      |   Byte 1  |   Byte 2     | Byte 3 | Byte 4 |
@@ -437,7 +447,6 @@ wait_ack_clock_low:
 ;           12 bit mode: Bits 3-0: Last 4 data bits
 do_i2c:
         red_off
-        green_off
 
         ; Initialize previous value
         movf    PORTB, w
@@ -445,6 +454,7 @@ do_i2c:
         movwf   I2C_PREV
 
 i2c_loop:
+        green_off
         call i2c_wait_for_change
 
         goto_if_i2cstart    i2c_addr; Ready for address phase
@@ -461,18 +471,21 @@ i2c_addr:
         gotonz  do_i2c              ; Reset if no address match
         call    i2c_ack
 
-        ; Read first byte
-i2c_byte0:
-        call    i2c_wait_for_change
-        goto_if_i2cstop     do_i2c  ; Reset on stop
-        goto_notif_i2cstart i2c_byte0
-        i2c_read_byte       do_i2c  ; May jump back to do_i2c
-        call    i2c_ack
+        ; Read data bytes
+        i2c_byte    FAN_21BIT,  do_i2c
+        i2c_byte    TEMP,       do_i2c
+        i2c_byte    FAN_OUT0,   do_i2c
+        i2c_byte    FAN_OUT1,   do_i2c
 
-        fan_send_command
-
+        ; Wait for stop
+i2c_wait_stop:
+        call i2c_wait_for_change
+        goto_if_i2cstop     i2c_do_command    ; Reset on stop
+        goto    i2c_wait_stop
         green_off
 
+i2c_do_command:
+        fan_send_command
         goto    do_i2c
 
         end
