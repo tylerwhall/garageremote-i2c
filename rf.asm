@@ -431,22 +431,4 @@ i2c_addr:
 
         goto    do_i2c
 
-halt:
-        green_on
-        red_on
-        goto halt
-
-green_halt:
-        red_off
-        green_on
-        goto green_halt
-
-red_halt:
-        red_on
-        green_off
-        goto red_halt
-
-        ; Wait for start (sda x low, scl high)
-
-        goto    do_i2c
         end
