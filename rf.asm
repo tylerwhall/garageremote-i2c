@@ -12,7 +12,7 @@
 ;RF_DF       equ     D'208213' ;305
 RF_DF       equ     D'207411'
 
-KHZ3_DELAY  equ     D'158' ; 476MHz/3
+KHZ3_DELAY  equ     D'152' ; was 476MHz/3. Now experimental
 
 ; RF commands (first byte of 3)
 RF_WAPP     equ     0x0
@@ -47,9 +47,6 @@ TRIS_I2C_ACK    equ     TRIS_NORMAL & ~(1 << I2C_SDA)
 ; RF Ceiling Fan Protocol
 ; 3KHz, 1 = 0b110, 0 = 0b010
 ; 11.5 ms between packets
-
-FAN_LIGHT_CMD   equ     b'110010000001'
-FAN21_CMD       equ     b'1110111110001101'
 
 ; Common Bank Variables
 TEMP        equ     0x7
@@ -92,6 +89,7 @@ delayp  macro
 
 delayms macro   ms
         local   loop
+        call    delay_reset
         movlw   ms
         movwf   DELAY_LOOP_COUNT
 loop:
@@ -110,6 +108,7 @@ fan_bit macro   reg, bit
 
 fan_start   macro
         pin_off RF_DATA
+        call    delay_reset
         call    _fan_bit
         endm
 
@@ -162,7 +161,7 @@ loop:
         call    fan_cmd21bit
         btfss   FAN_21BIT, 0
         call    fan_cmd12bit
-        ; 11 ms delay between commands
+        ; 9 ms delay between commands
         delayms 9
         decfsz  FAN_LOOP_COUNT, f
         goto loop
@@ -237,16 +236,18 @@ fan_send4:
         fan_bit FAN_OUTB, 0
         retlw   0x0
 
+
 ; Uses 1 stack
 delayw:
         movwf   TEMP
-        movlw   0x0
-        movwf   TMR0
 delayw_loop:
         movf    TMR0, w
         subwf   TEMP, w
         btfsc   STATUS, C
         goto    delayw_loop
+delay_reset:
+        movlw   0x0
+        movwf   TMR0
         retlw   0x0
 
 ; Uses 2 stack
