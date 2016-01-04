@@ -12,7 +12,7 @@
 ;RF_DF       equ     D'208213' ;305
 RF_DF       equ     D'207411'
 
-KHZ3_DELAY  equ     D'152' ; was 476MHz/3. Now experimental
+KHZ3_DELAY  equ     D'152' ; was 476KHz/3. Now experimental
 
 ; RF commands (first byte of 3)
 RF_WAPP     equ     0x0
